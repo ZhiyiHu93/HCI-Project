@@ -1,17 +1,52 @@
-# React + Vite
+# TripAI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An AI-powered travel planning prototype that combines conversational trip planning with interactive flight search, map-based exploration, and budget tracking — all in one interface.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Chat Interface** — Conversational AI assistant that helps plan your trip step by step
+- **Flight Search** — Browse and compare flights with detailed info, add them to your itinerary
+- **Map Explorer** — Browse lodging, restaurants, and attractions on an interactive map
+- **Budget Tracker** — Set a budget and track spending across categories in real time
+- **Itinerary Panel** — View all saved and booked items, confirm bookings or remove items
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Prerequisites
 
-## Expanding the ESLint configuration
+- [Node.js](https://nodejs.org/) (v18 or later recommended)
+- npm (comes with Node.js)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-# HCI-Project
+### Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+cd YOUR_REPO_NAME
+
+# Install dependencies
+npm install
+
+# Start the dev server
+npm run dev
+```
+
+Then open [http://localhost:5173](http://localhost:5173) in your browser.
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+The output will be in the `dist/` folder, ready to deploy.
+
+## Tech Stack
+
+- React
+- Vite
+- JavaScript (JSX)
+
+## License
+
+This project is for educational purposes.
