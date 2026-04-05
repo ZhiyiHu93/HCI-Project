@@ -868,6 +868,54 @@ function ItineraryView({ trip, updateTrip }) {
   const barColor = pct <= 60 ? "#22c55e" : pct <= 85 ? "#f59e0b" : "#ef4444";
   const catEmoji = { flight: "✈️", hotel: "🏨", dining: "🍴", activity: "🎯" };
 
+  const triggerDownload = (content, filename, type) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const safeName = trip.name.replace(/[^a-z0-9]/gi, "_");
+
+  const exportTxt = () => {
+    const lines = [
+      `Trip: ${trip.name}`,
+      `Dates: ${trip.startDate || "?"} → ${trip.endDate || "?"}`,
+      `Budget: $${spent} / $${budget}`,
+      "",
+    ];
+    const groups = {};
+    items.forEach(i => { const k = i.date || "Unscheduled"; (groups[k] = groups[k] || []).push(i); });
+    const keys = Object.keys(groups).sort((a, b) => a === "Unscheduled" ? 1 : b === "Unscheduled" ? -1 : a.localeCompare(b));
+    keys.forEach(k => {
+      lines.push(`=== ${k === "Unscheduled" ? "Unscheduled" : new Date(k + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} ===`);
+      groups[k].forEach(i => lines.push(`  [${i.category}] ${i.name}  $${i.price}  (${i.status})`));
+      lines.push("");
+    });
+    triggerDownload(lines.join("\n"), `${safeName}_itinerary.txt`, "text/plain");
+  };
+
+  const exportCsv = () => {
+    const rows = [["Date", "Day", "Category", "Name", "Price (USD)", "Status"]];
+    const sorted = [...items].sort((a, b) => (a.date || "zzz").localeCompare(b.date || "zzz"));
+    sorted.forEach(i => {
+      const dayIdx = tripDates.indexOf(i.date || "");
+      rows.push([
+        i.date || "Unscheduled",
+        dayIdx >= 0 ? `Day ${dayIdx + 1}` : "",
+        i.category,
+        i.name,
+        i.price,
+        i.status,
+      ]);
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    triggerDownload(csv, `${safeName}_itinerary.csv`, "text/csv");
+  };
+
   const ItemCard = ({ item }) => (
     <div
       draggable
@@ -964,7 +1012,15 @@ function ItineraryView({ trip, updateTrip }) {
           <span style={{ fontWeight: 700, color: "#0f172a" }}>{items.length}</span> items ·{" "}
           <span style={{ color: "#16a34a", fontWeight: 700 }}>{items.filter(i => i.status === "booked").length} booked</span>
         </div>
-        <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>${spent}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>${spent}</div>
+          <button onClick={exportTxt} title="Export as text file" style={{ padding: "4px 8px", borderRadius: 7, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 10, fontWeight: 700, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+            <Icon name="externalLink" size={10} color="#64748b" /> TXT
+          </button>
+          <button onClick={exportCsv} title="Export as CSV (opens in Excel)" style={{ padding: "4px 8px", borderRadius: 7, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 10, fontWeight: 700, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+            <Icon name="externalLink" size={10} color="#64748b" /> CSV
+          </button>
+        </div>
       </div>
 
       {/* Budget bar */}
@@ -1087,6 +1143,8 @@ export default function TripAI() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightPanel, setRightPanel] = useState(null); // null | "flights" | "map" | "itinerary" | "budget"
   const [helpOpen, setHelpOpen] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(370);
+  const rightPanelWidthRef = useRef(370);
 
   const currentTrip = trips.find(t => t.id === currentTripId) || trips[0];
 
@@ -1098,11 +1156,31 @@ export default function TripAI() {
     const t = createTrip("New Trip");
     setTrips(prev => [...prev, t]);
     setCurrentTripId(t.id);
-    setRightPanel(null);
   };
 
   const renameTrip = useCallback((id, name) => {
     setTrips(prev => prev.map(t => t.id === id ? { ...t, name } : t));
+  }, []);
+
+  const onDividerMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = rightPanelWidthRef.current;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMouseMove = (ev) => {
+      const w = Math.max(260, Math.min(700, startWidth + (startX - ev.clientX)));
+      rightPanelWidthRef.current = w;
+      setRightPanelWidth(w);
+    };
+    const onMouseUp = () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   }, []);
 
   const RIGHT_TABS = [
@@ -1123,6 +1201,7 @@ export default function TripAI() {
         input[type=number]{-moz-appearance:textfield}
         ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
         .leaflet-container { font-family: inherit; }
+        .divider-handle:hover { background: #bfdbfe !important; }
       `}</style>
 
       {/* ── Left Sidebar ───────────────────────────────────────────────────── */}
@@ -1146,42 +1225,51 @@ export default function TripAI() {
           sidebarOpen={sidebarOpen}
           onOpenSidebar={() => setSidebarOpen(true)}
           onFlightsReady={() => setRightPanel("flights")}
-          onDestinationsReady={() => { setRightPanel(prev => prev === "map" ? prev : "map"); }}
-          rightPanelOpen={!!rightPanel}
+          onDestinationsReady={() => setRightPanel(prev => prev || "map")}
+          rightPanelOpen={true}
           onOpenPanel={setRightPanel}
         />
       </div>
 
-      {/* ── Right Panel ────────────────────────────────────────────────────── */}
-      {rightPanel && (
-        <div style={{ width: 370, background: "#f8fafc", borderLeft: "1px solid #e2e8f0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-          {/* Tab bar */}
-          <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "stretch", flexShrink: 0 }}>
-            {RIGHT_TABS.map(tab => (
-              <button key={tab.key} onClick={() => setRightPanel(tab.key)} style={{
-                flex: 1, padding: "12px 2px 10px", border: "none", background: "none", cursor: "pointer",
-                fontSize: 10, fontWeight: 700, display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-                color: rightPanel === tab.key ? tab.color : "#94a3b8",
-                borderBottom: rightPanel === tab.key ? `2.5px solid ${tab.color}` : "2.5px solid transparent",
-              }}>
-                <Icon name={tab.icon} size={15} color={rightPanel === tab.key ? tab.color : "#94a3b8"} />
-                {tab.label}
-              </button>
-            ))}
-            <button onClick={() => setRightPanel(null)} style={{ padding: "12px 10px", border: "none", background: "none", cursor: "pointer", color: "#94a3b8", display: "flex", alignItems: "center" }}>
-              <Icon name="x" size={16} color="#94a3b8" />
-            </button>
-          </div>
+      {/* ── Drag Divider ───────────────────────────────────────────────────── */}
+      <div
+        className="divider-handle"
+        onMouseDown={onDividerMouseDown}
+        style={{ width: 5, flexShrink: 0, cursor: "col-resize", background: "transparent", transition: "background 0.15s", zIndex: 10 }}
+      />
 
-          {/* Content */}
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            {rightPanel === "flights"   && <FlightsPanel      trip={currentTrip} updateTrip={updateTrip} />}
-            {rightPanel === "map"       && <DestinationsPanel trip={currentTrip} updateTrip={updateTrip} />}
-            {rightPanel === "itinerary" && <ItineraryView     trip={currentTrip} updateTrip={updateTrip} />}
-            {rightPanel === "budget"    && <BudgetPanel       trip={currentTrip} updateTrip={updateTrip} />}
-          </div>
+      {/* ── Right Panel — always visible ───────────────────────────────────── */}
+      <div style={{ width: rightPanelWidth, background: "#f8fafc", borderLeft: "1px solid #e2e8f0", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+        {/* Tab bar */}
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "stretch", flexShrink: 0 }}>
+          {RIGHT_TABS.map(tab => (
+            <button key={tab.key} onClick={() => setRightPanel(tab.key)} style={{
+              flex: 1, padding: "12px 2px 10px", border: "none", background: "none", cursor: "pointer",
+              fontSize: 10, fontWeight: 700, display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              color: rightPanel === tab.key ? tab.color : "#94a3b8",
+              borderBottom: rightPanel === tab.key ? `2.5px solid ${tab.color}` : "2.5px solid transparent",
+            }}>
+              <Icon name={tab.icon} size={15} color={rightPanel === tab.key ? tab.color : "#94a3b8"} />
+              {tab.label}
+            </button>
+          ))}
         </div>
-      )}
+
+        {/* Content */}
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          {rightPanel === null && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 14, padding: 32, textAlign: "center" }}>
+              <Icon name="compass" size={52} color="#e2e8f0" />
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#cbd5e1" }}>Your trip details will appear here</div>
+              <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>Chat with TripAI to get flight suggestions, hotel picks, and more — then select a tab above to explore.</div>
+            </div>
+          )}
+          {rightPanel === "flights"   && <FlightsPanel      trip={currentTrip} updateTrip={updateTrip} />}
+          {rightPanel === "map"       && <DestinationsPanel trip={currentTrip} updateTrip={updateTrip} />}
+          {rightPanel === "itinerary" && <ItineraryView     trip={currentTrip} updateTrip={updateTrip} />}
+          {rightPanel === "budget"    && <BudgetPanel       trip={currentTrip} updateTrip={updateTrip} />}
+        </div>
+      </div>
 
       {/* ── Help Modal ─────────────────────────────────────────────────────── */}
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
